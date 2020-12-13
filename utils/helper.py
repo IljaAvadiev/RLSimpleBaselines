@@ -4,7 +4,7 @@ import random
 def print_policy(pi,
                  nS,
                  n_cols,
-                 name=None,
+                 name='FrozenLake',
                  terminal_states=[5, 7, 11, 12, 15],
                  actions_mapping={0: '\u2190', 1: '\u2193', 2: '\u2192', 3: '\u2191'}):
     '''
@@ -81,3 +81,28 @@ def print_state_value_func(V, n_cols, name=None):
         end = '\n' if (state + 1) % n_cols == 0 else ' '
         value = V[state]
         print(f'{value:.5f}', end=end)
+
+
+def generate_episode(env, pi):
+    '''
+    Generates an episode following a policy pi.
+    An episode is a succession of experiences until the terminal state. 
+    A tuple of state, action, reward, next_state and done constitute an exprience.
+
+    Args: 
+        env: OpenAI gym environment to interract with
+        pi:  Policy that is used to create an episode
+
+    Returns:
+        episode
+    '''
+    episode = []
+    obs, done = env.reset(), False
+    while not done:
+        action = pi(obs)
+        new_obs, reward, done, _ = env.step(action)
+        experience = (obs, action, reward, new_obs, done)
+        episode.append(experience)
+        obs = new_obs
+
+    return episode
