@@ -1,4 +1,4 @@
 venv
-progress
+tests
 .ipynb_checkpoints
 /utils/__pycache__
