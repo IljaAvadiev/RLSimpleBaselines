@@ -1,6 +1,8 @@
 argon2-cffi==20.1.0
 async-generator==1.10
+atari-py==0.2.6
 attrs==20.3.0
+autopep8==1.5.4
 backcall==0.2.0
 bleach==3.2.1
 box2d-py==2.3.8
@@ -34,6 +36,7 @@ nbformat==5.0.8
 nest-asyncio==1.4.3
 notebook==6.1.5
 numpy==1.19.4
+opencv-python==4.4.0.46
 packaging==20.7
 pandocfilters==1.4.3
 parso==0.7.1
@@ -43,6 +46,7 @@ Pillow==8.0.1
 prometheus-client==0.9.0
 prompt-toolkit==3.0.8
 ptyprocess==0.6.0
+pycodestyle==2.6.0
 pycparser==2.20
 pyglet==1.5.0
 Pygments==2.7.3
@@ -57,10 +61,12 @@ Send2Trash==1.5.0
 six==1.15.0
 terminado==0.9.1
 testpath==0.4.4
+toml==0.10.2
 torch==1.7.1+cpu
 torchaudio==0.7.2
 torchvision==0.8.2+cpu
 tornado==6.1
+tqdm==4.54.1
 traitlets==5.0.5
 typing-extensions==3.7.4.3
 wcwidth==0.2.5
