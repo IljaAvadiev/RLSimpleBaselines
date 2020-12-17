@@ -35,14 +35,29 @@ class RepeatAction(Wrapper):
         super(RepeatAction, self).__init__(env)
         self.repeat = repeat
 
+        # # to trigger done when you lose a life
+        # self.ale = env.unwrapped.ale
+        # self.lives = 0
+
     def step(self, action):
         sum_reward = 0
         for _ in range(self.repeat):
             observation, reward, done, info = self.env.step(action)
             sum_reward += reward
+
+            # # if you lose a life trigger done
+            # new_lives = self.ale.lives()
+            # done = done or new_lives < self.lives
+            # self.lives = new_lives
+
             if done:
                 break
         return observation, sum_reward, done, info
+
+    # def reset(self):
+    #     observation = self.env.reset()
+    #     self.lives = self.ale.lives()
+    #     return observation
 
 
 # remove y channel
