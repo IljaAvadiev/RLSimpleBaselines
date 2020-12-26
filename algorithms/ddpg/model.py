@@ -24,10 +24,14 @@ class Value(nn.Module):
             'cuda:0' if torch.cuda.is_available() else 'cpu')
 
         self.optimizer = optim.Adam(self.parameters(), lr=alpha)
+        self.loss = torch.nn.MSELoss()
 
     def forward(self, state, action):
         x = torch.tensor(state, dtype=torch.float32).to(self.device)
-        y = torch.tensor(action, dtype=torch.float32).to(self.device)
+        if isinstance(action, torch.Tensor):
+            y = action
+        else:
+            y = torch.tensor(action, dtype=torch.float32).to(self.device)
 
         x = self.activation(self.input_layer(x))
         x = torch.cat((x, y), dim=1)
@@ -75,3 +79,7 @@ class Policy(nn.Module):
         # scale from [min, max] to [action_min, action_max]
         # f(x) = ((action_max - action_min) * (x - min)) / (max - min) + action_min
         return ((self.action_max - self.action_min) * (x - self.min)) / (self.max - self.min) + self.action_min
+
+    def act(self, state):
+        with torch.no_grad():
+            return self(state).detach().cpu().numpy()
