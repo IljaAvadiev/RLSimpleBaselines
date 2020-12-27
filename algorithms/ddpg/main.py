@@ -6,18 +6,18 @@ env = gym.make('LunarLanderContinuous-v2')
 num_episodes = 10000
 alpha = 0.0001
 gamma = 0.99
-tau = 0.995
+tau = 0.999
 state_dims = env.observation_space.shape[0]
 action_dims = env.action_space.shape[0]
 action_ranges = (env.action_space.low[0], env.action_space.high[0])
 warmup = 10
-mem_size = 10000
+mem_size = 1000000
 batch_size = 64
 average_size = 100
 win_reward = 200
 
 ddpg_agent = Agent(state_dims, action_dims, action_ranges,
-                   (400, 200), alpha, gamma, tau, mem_size, batch_size)
+                   (400, 300), alpha, gamma, tau, mem_size, batch_size)
 reward_tracking = []
 reward_averaging = []
 for episode in range(num_episodes):
