@@ -16,8 +16,8 @@ class Actor(nn.Module):
             [nn.Linear(hidden_dims[i], hidden_dims[i+1])
              for i in range(len(hidden_dims)-1)]
         )
-        self.mu_layer = nn.Linear(hidden_dims[-1], 1)
-        self.log_sigma_layer = nn.Linear(hidden_dims[-1], 1)
+        self.mu_layer = nn.Linear(hidden_dims[-1], action_dims)
+        self.log_sigma_layer = nn.Linear(hidden_dims[-1], action_dims)
 
         self.optimizer = optim.Adam(self.parameters(), lr=alpha)
         self.device = torch.device(
