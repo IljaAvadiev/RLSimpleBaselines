@@ -1,13 +1,13 @@
-# ReinforcementLearning
+# Reinforcment Learning Simple Baselines
 
-## DQN CartPole-v1
+Simple Baselines is intended to be an educational resource for Reinforcment Learning inspired by OpenAI Spinning Up.
 
-![DQN CartPole](/showcase/CartPole-v1.gif)
-
-## DQN MountainCar-v0
-
-![DQN MountainCar](/showcase/MountainCar-v0.gif)
-
-## DQN LunarLander-v2
-
-![DQN LunarLander](/showcase/LunarLander-v2.gif)
+| Algorithm | Status |
+|:---------:|:------:|
+| dqn       |    :x: |
+| reinforce |    :x: |
+| a2c       |    :x: |
+| ddpg      |    :x: |
+| td3       |    :x: |
+| sac       |    :x: |
+| ppo       |    :x: |
