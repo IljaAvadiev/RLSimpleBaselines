@@ -1,3 +1,0 @@
-# policy iteration
-
-# value iteration

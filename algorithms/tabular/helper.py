@@ -38,7 +38,7 @@ def print_policy(pi,
         print(actions_mapping[action].rjust(10), end=end)
 
 
-def create_random_policy(nS, nA, seed=42):
+def create_random_policy(nS, nA, seed=0):
     '''
     Generates a random policy for a gridworld
 
@@ -52,14 +52,7 @@ def create_random_policy(nS, nA, seed=42):
     '''
 
     random.seed(seed)
-    policy = {}
-    for i in range(nS):
-        policy[i] = random.randint(0, nA-1)
-
-    def random_policy(s):
-        return policy[s]
-
-    return random_policy
+    return {state: random.randint(0, nA-1) for state in range(nS)}
 
 
 def print_state_value_func(V, n_cols, name=None):
