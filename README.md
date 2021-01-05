@@ -5,8 +5,8 @@ Simple Baselines is intended to be an educational resource for Reinforcment Lear
 |   Tabular Methods   | Status |
 | :-----------------: | :----: |
 | Dynamic Programming |  :x:   |
-|   RL: Prediction    |  :x:   |
-|     RL: Control     |  :x:   |
+|     Monte Carlo     |  :x:   |
+| Temporal Difference |  :x:   |
 
 | Function Approximators | Status |
 | :--------------------: | :----: |
