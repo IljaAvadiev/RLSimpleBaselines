@@ -6,6 +6,17 @@ import numpy as np
 
 
 def policy_evaluation(pi, model, gamma=0.99, theta=1e-5):
+    '''
+    Calculate the value function of a given policy pi
+    Args: 
+        pi:      policy to be evaluated (a dictionary)
+        model:   a dictionary containing the dynamics of the MDP 
+        gamma:   discount factor
+        theta:   threshhold value to interrupt the policy evaluation
+
+    Returns: 
+        State value function V
+    '''
     nS = len(model)
     V = np.zeros(nS)
     V_old = V.copy()
@@ -25,6 +36,19 @@ def policy_evaluation(pi, model, gamma=0.99, theta=1e-5):
 
 
 def policy_improvement(V, model, gamma=0.99):
+    '''
+    Calculate an improved policy pi by acting greedily using the value function V of the current policy
+
+    Args: 
+        V:       state value function of a given policy
+        model:   a dictionary containing the dynamics of the MDP 
+        gamma:   discount factor
+
+    Returns: 
+        pi:      improved policy
+
+    '''
+
     nS = len(model)
     nA = len(model[0])
     Q = np.zeros((nS, nA))
@@ -39,6 +63,18 @@ def policy_improvement(V, model, gamma=0.99):
 
 
 def policy_iteration(pi, model, gamma=0.99, theta=1e-5):
+    '''
+    Finds an optimal policy using policy iteration
+
+    Args: 
+        pi:      starting policy
+        model:   a dictionary containing the dynamics of the MDP 
+        gamma:   discount factor
+        theta:   threshhold value to interrupt the policy evaluation
+
+    Returns: 
+        Optimal value function and policy
+    '''
     while True:
         V = policy_evaluation(pi, model, gamma, theta)
         new_pi = policy_improvement(V, model, gamma)
@@ -54,6 +90,17 @@ def policy_iteration(pi, model, gamma=0.99, theta=1e-5):
 
 
 def value_iteration(model, gamma=0.99, theta=1e-5):
+    '''
+    Finds an optimal policy using value iteration
+
+    Args: 
+        model:   a dictionary containing the dynamics of the MDP 
+        gamma:   discount factor
+        theta:   threshhold value to interrupt the policy evaluation
+
+    Returns: 
+        Optimal value function and policy
+    '''
     nS = len(model)
     nA = len(model[0])
     V = np.zeros(nS)
