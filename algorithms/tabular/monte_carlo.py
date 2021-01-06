@@ -25,15 +25,15 @@ class MCAgent():
         if self.epsilon < self.epsilon_end:
             self.epsilon = self.epsilon_end
 
-    def act_greedy(self, state):
-        action = np.argmax(self.Q[state])
+    def act_greedy(self, obs):
+        action = np.argmax(self.Q[obs])
         return action
 
-    def act_eps_greedy(self, state):
+    def act_eps_greedy(self, obs):
         if np.random.rand() > self.epsilon:
-            action = self.act_eps_greedy(state)
+            action = self.act_greedy(obs)
         else:
-            action = np.random.choice(len(self.Q[state]))
+            action = np.random.choice(len(self.Q[obs]))
         return action
 
     def learn(self, episode):
