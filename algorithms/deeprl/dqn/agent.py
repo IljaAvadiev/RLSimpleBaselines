@@ -4,6 +4,7 @@ from itertools import count
 from copy import deepcopy
 import torch
 import numpy as np
+from gym import wrappers
 
 
 class DQN():
@@ -49,9 +50,8 @@ class DQN():
 
     def sample_batch(self):
         states, actions, next_states, rewards, terminals = self.memory.sample_batch()
-
         states = torch.tensor(states, dtype=torch.float32).to(self.device)
-        actions = torch.tensor(actions, dtype=torch.float32).to(self.device)
+        actions = torch.tensor(actions, dtype=torch.int64).to(self.device)
         next_states = torch.tensor(
             next_states, dtype=torch.float32).to(self.device)
         rewards = torch.tensor(rewards, dtype=torch.float32).to(self.device)
@@ -69,20 +69,24 @@ class DQN():
                 torch.max(self.q_target(next_states).detach(), dim=1, keepdim=True)[
                     0] * torch.logical_not(terminals)
 
-        online = torch.max(self.q_online(states), dim=1, keepdim=True)[0]
+        online = self.q_online(states).gather(dim=1, index=actions)
 
         error = target-online
         loss = error.pow(2).mul(0.5).mean()
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.q_online.parameters(), 1.0)
         self.optimizer.step()
 
     def replace_target_network(self):
-        self.q_target.load_state_dict(self.q_online.state_dict())
+        self.q_target = deepcopy(self.q_online)
 
-    def learn(self, max_episodes, warmup, replace_steps, average_len=100, log=False, evaluate=False):
+    def learn(self, max_episodes, warmup, replace_steps, average_len, target_reward, log=False):
         step = 0
         rewards = []
         rewards_mean = []
+
+        eval_rewards = []
+        eval_rewards_mean = []
 
         for episode in range(max_episodes):
             state, done = self.env.reset(), False
@@ -100,12 +104,23 @@ class DQN():
                 if step % replace_steps == 0:
                     self.replace_target_network()
             rewards.append(reward_sum)
+            eval_rewards.append(self.evaluate())
             if episode >= average_len:
                 mean = np.mean(rewards[-average_len:])
+                eval_mean = np.mean(eval_rewards[-average_len:])
                 rewards_mean.append(mean)
+                eval_rewards_mean.append(mean)
                 if log:
-                    print(
-                        f'Episode: {episode}, Step: {step} Mean: {mean}, Epsilon: {self.epsilon}, MemoryLength {len(self.memory)}')
+                    print('--------------------------------------------------------')
+                    print(f'Episode: {episode}')
+                    print(f'Step: {step}')
+                    print(f'Train Mean: {mean}')
+                    print(f'Eval Mean: {eval_mean}')
+                    print('--------------------------------------------------------')
+                    if eval_mean >= target_reward:
+                        print('GOAL ACHIEVED!')
+                        self.q_online.save()
+                        break
 
     def evaluate(self):
         state, done = self.env.reset(), False

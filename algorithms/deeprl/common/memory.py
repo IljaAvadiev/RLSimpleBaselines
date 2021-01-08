@@ -15,7 +15,7 @@ class ReplayBuffer():
         self.states = np.empty(
             shape=(max_memory_size, state_dims), dtype=np.float32)
         self.actions = np.empty(
-            shape=(max_memory_size, action_dims), dtype=np.float32)
+            shape=(max_memory_size, 1), dtype=np.float32)
         self.next_states = np.empty(
             shape=(max_memory_size, state_dims), dtype=np.float32)
         self.rewards = np.empty(shape=(max_memory_size, 1), dtype=np.float32)
