@@ -1,26 +1,34 @@
-from algorithms.deeprl.reinforce.model import Pi, DEVICE
+from algorithms.deeprl.vgp.model import Pi, V, DEVICE
 import torch
 import numpy as np
 
 
-class Reinforce():
+class VPG():
     def __init__(self, env, state_dims, action_dims, hidden_dims, activation, optimizer,
-                 alpha, gamma, dir, name):
+                 pi_alpha, v_alpha, beta, gamma, dir, name):
         self.env = env
+        self.beta = beta
         self.gamma = gamma
         self.pi = Pi(state_dims, action_dims,
                      hidden_dims, activation, dir, name)
+        self.v = V(state_dims, hidden_dims, activation, dir, name)
         self.device = DEVICE
-        self.optimzer = optimizer(self.pi.parameters(), alpha)
+        self.policy_optimzer = optimizer(self.pi.parameters(), pi_alpha)
+        self.value_optimzer = optimizer(self.v.parameters(), v_alpha)
 
     def reset(self):
         self.log_probs = []
         self.rewards = []
+        self.values = []
+        self.entropies = []
 
     def act(self, state):
         state = torch.tensor(state, dtype=torch.float32).to(self.device)
-        action, log_prob = self.pi(state)
+        action, log_prob, entropy = self.pi(state)
+        value = self.v(state)
         self.log_probs.append(log_prob)
+        self.values.append(value)
+        self.entropies.append(entropy)
         return action.cpu().detach().item()
 
     def optimize(self):
@@ -30,13 +38,23 @@ class Reinforce():
                             for i in range(trajectory_len)])
 
         log_probs = torch.vstack(self.log_probs).to(self.device)
+        values = torch.vstack(self.values).to(self.device)
+        entropies = torch.vstack(self.entropies).to(self.device)
         returns = torch.tensor(returns, dtype=torch.float32).to(
             self.device).view(-1, 1)
 
-        self.optimzer.zero_grad()
-        loss = -(log_probs * returns).mean()
-        loss.backward()
-        self.optimzer.step()
+        advantages = returns - values
+
+        self.policy_optimzer.zero_grad()
+        policy_loss = -(log_probs * advantages.detach() +
+                        self.beta * entropies).mean()
+        policy_loss.backward()
+        self.policy_optimzer.step()
+
+        self.value_optimzer.zero_grad()
+        value_loss = advantages.pow(2).mean()
+        value_loss.backward()
+        self.value_optimzer.step()
 
     def learn(self, max_episodes, average_len, target_reward, log=False):
         step = 0
