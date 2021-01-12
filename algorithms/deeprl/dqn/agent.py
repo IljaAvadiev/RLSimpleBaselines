@@ -20,7 +20,7 @@ class DQN():
         self.epsilon_decay = epsilon_decay
 
         self.memory = ReplayBuffer(
-            state_dims, action_dims, max_memory_size, batch_size)
+            state_dims, 1, max_memory_size, batch_size)
 
         self.q_online = Q(state_dims, action_dims,
                           hidden_dims, activation, dir, name + '.pt')
