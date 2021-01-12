@@ -2,84 +2,63 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+import os
+
+DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
-class Value(nn.Module):
-    def __init__(self, state_dims, action_dims, hidden_dims, alpha):
-        super(Value, self).__init__()
+class Q(nn.Module):
+    def __init__(self, state_dims, action_dims, hidden_dims, activation, dir, name):
+        super(Q, self).__init__()
+
+        assert len(hidden_dims) == 2
         self.input_layer = nn.Linear(state_dims, hidden_dims[0])
-
-        self.hidden_layers = nn.ModuleList()
-        input_dims = hidden_dims[0] + action_dims
-        for i in range(len(hidden_dims)-1):
-            hidden_layer = nn.Linear(
-                input_dims, hidden_dims[i+1])
-            self.hidden_layers.append(hidden_layer)
-            input_dims = hidden_dims[i+1]
+        self.hidden_layer = nn.Linear(
+            hidden_dims[0] + action_dims, hidden_dims[1])
         self.output_layer = nn.Linear(hidden_dims[-1], 1)
 
-        self.activation = F.relu
-
-        self.device = torch.device(
-            'cuda:0' if torch.cuda.is_available() else 'cpu')
-
-        self.optimizer = optim.Adam(self.parameters(), lr=alpha)
-        self.loss = torch.nn.MSELoss()
+        self.activation = activation
+        self.path = os.path.join(dir, name)
+        self.to(DEVICE)
 
     def forward(self, state, action):
-        x = torch.tensor(state, dtype=torch.float32).to(self.device)
-        if isinstance(action, torch.Tensor):
-            y = action
-        else:
-            y = torch.tensor(action, dtype=torch.float32).to(self.device)
-
+        x = state
+        y = action
         x = self.activation(self.input_layer(x))
         x = torch.cat((x, y), dim=1)
-        for hidden_layer in self.hidden_layers:
-            x = self.activation(hidden_layer(x))
+        x = self.activation(self.hidden_layer(x))
         x = self.output_layer(x)
         return x
 
+    def save(self):
+        torch.save(self.state_dict(), self.path)
 
-class Policy(nn.Module):
-    def __init__(self, state_dims, action_dims, action_ranges, hidden_dims, alpha):
-        super(Policy, self).__init__()
+    def load(self):
+        self.load_state_dict(torch.load(self.path))
+
+
+class Pi(nn.Module):
+    def __init__(self, state_dims, action_dims, action_limit, hidden_dims, activation, dir, name):
+        super(Pi, self).__init__()
+        assert len(hidden_dims) == 2
         self.input_layer = nn.Linear(state_dims, hidden_dims[0])
-        self.hidden_layers = nn.ModuleList([
-            nn.Linear(hidden_dims[i], hidden_dims[i+1]) for i in range(len(hidden_dims)-1)
-        ])
+        self.hidden_layer = nn.Linear(hidden_dims[0], hidden_dims[1])
         self.output_layer = nn.Linear(hidden_dims[-1], action_dims)
 
-        self.activation = F.relu
-
-        self.device = torch.device(
-            'cuda:0' if torch.cuda.is_available() else 'cpu')
-        self.optimizer = optim.Adam(self.parameters(), lr=alpha)
-
-        # prepare these variables for rescaling
-        self.min = torch.tanh(torch.tensor(
-            [float('-inf')], dtype=torch.float32)).to(self.device)
-        self.max = torch.tanh(torch.tensor(
-            [float('inf')], dtype=torch.float32)).to(self.device)
-        self.action_min = torch.tensor(
-            action_ranges[0], dtype=torch.float32).to(self.device)
-        self.action_max = torch.tensor(
-            action_ranges[1], dtype=torch.float32).to(self.device)
+        self.action_limit = action_limit
+        self.activation = activation
+        self.path = os.path.join(dir, name)
+        self.to(DEVICE)
 
     def forward(self, state):
-        x = torch.tensor(state, dtype=torch.float32).to(self.device)
+        x = state
         x = self.activation(self.input_layer(x))
-        for hidden_layer in self.hidden_layers:
-            x = self.activation(hidden_layer(x))
+        x = self.activation(self.hidden_layer(x))
         x = torch.tanh(self.output_layer(x))
-        return self.rescale(x)
+        return x * self.action_limit
 
-    def rescale(self, x):
-        # use the following rescaling function
-        # scale from [min, max] to [action_min, action_max]
-        # f(x) = ((action_max - action_min) * (x - min)) / (max - min) + action_min
-        return ((self.action_max - self.action_min) * (x - self.min)) / (self.max - self.min) + self.action_min
+    def save(self):
+        torch.save(self.state_dict(), self.path)
 
-    def act(self, state):
-        with torch.no_grad():
-            return self(state).detach().cpu().numpy()
+    def load(self):
+        self.load_state_dict(torch.load(self.path))
