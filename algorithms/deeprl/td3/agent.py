@@ -1,140 +1,135 @@
+from algorithms.deeprl.ddpg.model import Pi, Q, DEVICE
 import torch
 import numpy as np
-from model import Actor, Critic
-from replay_buffer import ReplayBuffer
+from algorithms.deeprl.td3.model import Pi, Q
+from algorithms.deeprl.common.memory import ReplayBuffer
 from copy import deepcopy
 
 
-class Agent():
-    def __init__(self, state_dims, action_dims, hidden_dim1, hidden_dim2, lr_actor, lr_critic, gamma, tau, mem_size, batch_size, max_action, min_action, warmup):
-        self.memory = ReplayBuffer(
-            state_dims=state_dims, action_dims=action_dims, max_memsize=mem_size, batch_size=batch_size)
-        self.actor = Actor(
-            state_dims, action_dims, hidden_dim1, hidden_dim2, lr=lr_actor, name='actor_td3')
-        self.actor_target = deepcopy(self.actor)
+class TD3():
+    def __init__(self, env, state_dims, action_dims, action_limit, min_action, max_action, hidden_dims, activation, optimizer,
+                 pi_alpha, q_alpha, gamma, tau, max_memory_size, batch_size, dir, name):
 
-        self.critic_1 = Critic(state_dims, action_dims,
-                               hidden_dim1, hidden_dim2, lr_critic, 'critic_1_td3')
-        self.critic_2 = Critic(state_dims, action_dims,
-                               hidden_dim1, hidden_dim2, lr_critic, 'critic_2_td3')
-        self.critic_1_target = deepcopy(self.critic_1)
-        self.critic_2_target = deepcopy(self.critic_2)
-        self.min = min_action
-        self.max = max_action
+        self.env = env
         self.gamma = gamma
         self.tau = tau
         self.action_dims = action_dims
-        self.count = 0
-        self.warmup = warmup
-        self.device = self.actor.device
+        self.min = min_action
+        self.max = max_action
+        self.memory = ReplayBuffer(state_dims, action_dims,
+                                   max_memory_size=max_memory_size, batch_size=batch_size)
+        self.online_policy = Pi(
+            state_dims, action_dims, action_limit, hidden_dims, activation, dir, name)
+        self.online_value_1 = Q(state_dims, action_dims,
+                                hidden_dims, activation, dir, name)
+        self.online_value_2 = Q(state_dims, action_dims,
+                                hidden_dims, activation, dir, name)
 
-    def choose_action(self, state):
-        self.count += 1
-        with torch.no_grad():
-            mu = 0
-            sigma = 0.1
-            noise = torch.tensor(np.random.normal(
-                mu, sigma, size=self.action_dims), dtype=torch.float32).to(self.device)
-            if self.count < self.warmup:
-                # take purely random action
-                action = noise
-            else:
-                state = torch.tensor(
-                    state, dtype=torch.float32).to(self.device)
-                action = self.actor(state)
-                action = action + noise
+        self.target_policy = deepcopy(self.online_policy)
+        self.target_value_1 = deepcopy(self.online_value_1)
+        self.target_value_2 = deepcopy(self.online_value_2)
 
-            return torch.clamp(action, self.min, self.max).cpu().detach().numpy()
+        self.device = DEVICE
+        self.policy_optimizer = optimizer(
+            self.online_policy.parameters(), pi_alpha)
+        self.value_optimizer_1 = optimizer(
+            self.online_value_1.parameters(), q_alpha, weight_decay=1e-2)
+        self.value_optimizer_2 = optimizer(
+            self.online_value_2.parameters(), q_alpha, weight_decay=1e-2)
 
-    def greedy_action(self, state):
-        with torch.no_grad():
-            state = torch.tensor(
-                state, dtype=torch.float32).to(self.device)
-            action = self.actor(state)
-            return action.cpu().detach().numpy()
+        # no grad calculations are required for target networks due to polyak averaging
+        for params in self.target_policy.parameters():
+            params.requires_grad = False
+        for params in self.target_value_1.parameters():
+            params.requires_grad = False
+        for params in self.target_value_2.parameters():
+            params.requires_grad = False
 
-    def store_transition(self, state, action, reward, next_state, done):
-        self.memory.add_memory(state, action, reward, next_state, done)
+    @torch.no_grad()
+    def act(self, state):
+        mu = 0
+        sigma = 0.1
+        noise = torch.tensor(np.random.normal(
+            mu, sigma, size=self.action_dims), dtype=torch.float32).to(self.device)
+        state = torch.tensor(
+            state, dtype=torch.float32).to(self.device)
+        action = self.online_policy(state)
+        action = action + noise
 
-    def learn(self):
-        if self.count < self.warmup:
-            return
-        states, actions, rewards, next_states, terminals = self.memory.sample()
+        return torch.clamp(action, self.min, self.max).cpu().detach().numpy()
+
+    @torch.no_grad()
+    def act_greedy(self, state):
+        state = torch.tensor(
+            state, dtype=torch.float32).to(self.device)
+        action = self.online_policy(state)
+        return action.cpu().detach().numpy()
+
+    def sample_batch(self):
+        states, actions, next_states, rewards, terminals = self.memory.sample_batch()
         states = torch.tensor(states, dtype=torch.float32).to(self.device)
         actions = torch.tensor(actions, dtype=torch.float32).to(self.device)
-        rewards = torch.tensor(rewards, dtype=torch.float32).to(self.device)
         next_states = torch.tensor(
             next_states, dtype=torch.float32).to(self.device)
+        rewards = torch.tensor(rewards, dtype=torch.float32).to(self.device)
         terminals = torch.tensor(
             terminals, dtype=torch.float32).to(self.device)
 
-        next_actions = self.actor_target(next_states).detach()
-        noise = torch.clamp(torch.normal(
-            0, 0.2, size=next_actions.shape), -0.5, 0.5)
-        next_actions += noise
+        return states, actions, next_states, rewards, terminals
 
-        next_actions = torch.clamp(next_actions, self.min, self.max)
+    def optimize(self, delay):
+        states, actions, next_states, rewards, terminals = self.sample_batch()
 
-        target_1 = self.critic_1_target(next_states, next_actions)
-        target_2 = self.critic_2_target(next_states, next_actions)
+        with torch.no_grad():
+            next_actions = self.target_policy(next_states).detach()
+            noise = torch.clamp(torch.normal(
+                0, 0.2, size=next_actions.shape), -0.5, 0.5)
+            next_actions += noise
 
-        target = rewards + \
-            self.gamma * torch.min(target_1, target_2) * \
-            torch.logical_not(terminals)
+            next_actions = torch.clamp(next_actions, self.min, self.max)
 
-        online_1 = self.critic_1(states, actions)
-        online_2 = self.critic_2(states, actions)
+            target_1 = self.target_value_1(next_states, next_actions)
+            target_2 = self.target_value_2(next_states, next_actions)
 
-        self.critic_1.optimizer.zero_grad()
-        self.critic_2.optimizer.zero_grad()
+            target = rewards + \
+                self.gamma * torch.min(target_1, target_2) * \
+                torch.logical_not(terminals)
 
-        loss_fn = torch.nn.MSELoss()
-        loss_1 = loss_fn(target, online_1)
-        loss_2 = loss_fn(target, online_2)
+        online_1 = self.online_value_1(states, actions)
+        online_2 = self.online_value_2(states, actions)
+
+        self.value_optimizer_1.zero_grad()
+        self.value_optimizer_2.zero_grad()
+        loss_1 = (online_1 - target.detach()).pow(2).mul(0.5).mean()
+        loss_2 = (online_2 - target.detach()).pow(2).mul(0.5).mean()
         critic_loss = loss_1 + loss_2
 
         critic_loss.backward()
-        self.critic_1.optimizer.step()
-        self.critic_2.optimizer.step()
+        self.value_optimizer_1.step()
+        self.value_optimizer_2.step()
 
-        if self.count % 2 == 0:
-            self.actor.optimizer.zero_grad()
-            actor_loss = -self.critic_1(states, self.actor(states)).mean()
+        if not delay:
+            self.policy_optimizer.zero_grad()
+            actor_loss = -(self.online_value_1(states,
+                                               self.online_policy(states)).mean())
             actor_loss.backward()
-            self.actor.optimizer.step()
-
+            self.policy_optimizer.step()
             self.update_target_weights()
 
     def update_target_weights(self):
-        actor_params = self.actor.named_parameters()
-        actor_target_params = self.actor_target.named_parameters()
-        critic_1_params = self.critic_1.named_parameters()
-        critic_2_params = self.critic_2.named_parameters()
-        critic_1_target_params = self.critic_1_target.named_parameters()
-        critic_2_target_params = self.critic_2_target.named_parameters()
-
-        actor_state_dict = dict(actor_params)
-        actor_target_state_dict = dict(actor_target_params)
-        critic_1_state_dict = dict(critic_1_params)
-        critic_2_state_dict = dict(critic_2_params)
-        critic_1_target_state_dict = dict(critic_1_target_params)
-        critic_2_target_state_dict = dict(critic_2_target_params)
-
-        for name in critic_1_state_dict:
-            critic_1_state_dict[name] = self.tau*critic_1_state_dict[name].clone() + \
-                (1-self.tau)*critic_1_target_state_dict[name].clone()
-
-        for name in critic_2_state_dict:
-            critic_2_state_dict[name] = self.tau*critic_2_state_dict[name].clone() + \
-                (1-self.tau)*critic_2_target_state_dict[name].clone()
-
-        for name in actor_state_dict:
-            actor_state_dict[name] = self.tau*actor_state_dict[name].clone() + \
-                (1-self.tau)*actor_target_state_dict[name].clone()
-
-        self.critic_1_target.load_state_dict(critic_1_state_dict)
-        self.critic_2_target.load_state_dict(critic_2_state_dict)
-        self.actor_target.load_state_dict(actor_state_dict)
+        # polyak averaging
+        with torch.no_grad():
+            # update q-value target network
+            for online, target in zip(self.online_value_1.parameters(), self.target_value_1.parameters()):
+                target.data.mul_(1-self.tau)
+                target.data.add_(self.tau * online.data)
+            for online, target in zip(self.online_value_2.parameters(), self.target_value_2.parameters()):
+                target.data.mul_(1-self.tau)
+                target.data.add_(self.tau * online.data)
+            # update policy target network
+            for online, target in zip(self.online_policy.parameters(), self.target_policy.parameters()):
+                target.data.mul_(1-self.tau)
+                target.data.add_(self.tau * online.data)
 
     def save(self):
         self.actor.save()
@@ -145,3 +140,63 @@ class Agent():
         self.actor.load()
         self.critic_1.save()
         self.critic_2.save()
+
+    def learn(self, max_episodes, warmup, target_reward, log=False):
+        step = 0
+        rewards = []
+        rewards_mean = []
+
+        eval_rewards = []
+        eval_rewards_mean = []
+
+        for episode in range(max_episodes):
+            state, done = self.env.reset(), False
+            reward_sum = 0
+            while not done:
+                step += 1
+                action = self.act(state)
+                next_state, reward, done, _ = self.env.step(action)
+                self.memory.add_memory(state, action, next_state, reward, done)
+                state = next_state
+                reward_sum += reward
+                if step > warmup:
+                    if step % 2 == 0:
+                        delay = False
+                    else:
+                        delay = True
+                    self.optimize(delay)
+
+            rewards.append(reward_sum)
+            eval_rewards.append(self.evaluate())
+            if episode >= 100:
+                mean = np.mean(rewards[-100:])
+                eval_mean = np.mean(eval_rewards[-100:])
+                rewards_mean.append(mean)
+                eval_rewards_mean.append(eval_mean)
+                if log:
+                    print('--------------------------------------------------------')
+                    print(f'Episode: {episode}')
+                    print(f'Step: {step}')
+                    print(f'Score: {reward_sum}')
+                    print(f'Train Mean: {mean}')
+                    print(f'Eval Score: {eval_rewards[-1]}')
+                    print(f'Eval Mean 100: {eval_mean}')
+                    print('--------------------------------------------------------')
+                    if eval_mean >= target_reward:
+                        print('GOAL ACHIEVED!')
+                        return eval_rewards_mean
+            else:
+                print('--------------------------------------------------------')
+                print(f'Episode: {episode}')
+
+        return eval_rewards_mean
+
+    def evaluate(self):
+        state, done = self.env.reset(), False
+        reward_sum = 0
+        while not done:
+            action = self.act_greedy(state)
+            next_state, reward, done, _ = self.env.step(action)
+            state = next_state
+            reward_sum += reward
+        return reward_sum
