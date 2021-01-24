@@ -2,18 +2,17 @@
 
 Simple Baselines is intended to be an educational resource for Reinforcment Learning inspired by OpenAI Spinning Up. Simple Baselines is a PyTorch implementation.
 
-|   Tabular Methods   | Status |
-| :-----------------: | :----: |
-| Dynamic Programming |  :x:   |
-|     Monte Carlo     |  :x:   |
-| Temporal Difference |  :x:   |
+|   Tabular Methods   |       Status       |
+| :-----------------: | :----------------: |
+| Dynamic Programming | :heavy_check_mark: |
+|     Monte Carlo     | :heavy_check_mark: |
+| Temporal Difference | :heavy_check_mark: |
 
-| Function Approximators | Status |
-| :--------------------: | :----: |
-|          dqn           |  :x:   |
-|       reinforce        |  :x:   |
-|          a2c           |  :x:   |
-|          ddpg          |  :x:   |
-|          td3           |  :x:   |
-|          sac           |  :x:   |
-|          ppo           |  :x:   |
+| Function Approheavy_check_markimators |       Status       |
+| :-----------------------------------: | :----------------: |
+|                  dqn                  | :heavy_check_mark: |
+|               reinforce               | :heavy_check_mark: |
+|                  a2c                  | :heavy_check_mark: |
+|                 ddpg                  | :heavy_check_mark: |
+|                  td3                  | :heavy_check_mark: |
+|                  ppo                  | :heavy_check_mark: |
