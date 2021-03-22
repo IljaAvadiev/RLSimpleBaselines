@@ -9,10 +9,23 @@ import random
 
 
 class DQN():
-    def __init__(self, env, double, hidden_dims=(128, 64), activation=F.relu, optimizer=optim.Adam,
-                 alpha=0.0001, gamma=0.99, epsilon_start=1, epsilon_end=0.05, epsilon_decay=0.000035,
-                 max_memory_size=1000000, batch_size=64,
-                 max_episodes=1000, warmup=100, replace_steps=100,
+    def __init__(self,
+                 env,
+                 double=False,
+                 hidden_dims=(128, 64),
+                 activation=F.relu,
+                 optimizer=optim.Adam,
+                 alpha=0.0001,
+                 gamma=0.99,
+                 epsilon_start=1,
+                 epsilon_end=0.05,
+                 epsilon_decay=0.000035,
+                 tau=1,
+                 max_memory_size=1000000,
+                 batch_size=64,
+                 max_episodes=1000,
+                 warmup=100,
+                 replace_steps=100,
                  seed=49,
                  log=False,
                  dir='tmp',
@@ -27,6 +40,7 @@ class DQN():
         self.epsilon = epsilon_start
         self.epsilon_end = epsilon_end
         self.epsilon_decay = epsilon_decay
+        self.tau = tau
 
         self.max_episodes = max_episodes
         self.warmup = warmup
@@ -42,6 +56,10 @@ class DQN():
         self.q_online = Q(self.state_dims, self.action_dims,
                           hidden_dims, activation, dir, name + '.pt')
         self.q_target = deepcopy(self.q_online)
+
+        for param in self.q_target.parameters():
+            param.requires_grad = False
+
         self.device = DEVICE
         self.optimizer = optimizer(self.q_online.parameters(), alpha)
 
@@ -108,8 +126,12 @@ class DQN():
         torch.nn.utils.clip_grad_norm_(self.q_online.parameters(), 1.0)
         self.optimizer.step()
 
-    def replace_target_network(self):
-        self.q_target = deepcopy(self.q_online)
+    def update_target_network(self):
+        with torch.no_grad():
+            for online, target in zip(self.q_online.parameters(), self.q_target.parameters()):
+                new_value = self.tau * online.data + \
+                    (1 - self.tau) * target.data
+                target.data.copy_(new_value)
 
     def learn(self):
         step = 0
@@ -134,7 +156,7 @@ class DQN():
                     self.optimize()
                     self.decrease_epsilon()
                 if step % self.replace_steps == 0:
-                    self.replace_target_network()
+                    self.update_target_network()
             rewards.append(reward_sum)
             # evaluation step
             eval_reward = self.evaluate()
