@@ -1,29 +1,41 @@
 from algorithms.deeprl.dqn.model import Q, DEVICE
 from algorithms.deeprl.common.memory import ReplayBuffer
-from itertools import count
 from copy import deepcopy
 import torch
+import torch.nn.functional as F
+import torch.optim as optim
 import numpy as np
-from gym import wrappers
+import os
 
 
 class DQN():
-    def __init__(self, env, double, state_dims, action_dims, hidden_dims, activation, optimizer,
-                 alpha, gamma, epsilon_start, epsilon_end, epsilon_decay,
-                 max_memory_size, batch_size, dir, name):
+    def __init__(self, env, double, hidden_dims=(128, 64), activation=F.relu, optimizer=optim.Adam,
+                 alpha=0.0001, gamma=0.99, epsilon_start=1, epsilon_end=0.05, epsilon_decay=0.000035,
+                 max_memory_size=1000000, batch_size=64,
+                 max_episodes=1000, warmup=100, replace_steps=100, log=False,
+                 dir='tmp', name='name'):
 
         self.env = env
         self.double = double
-        self.action_dims = action_dims
+        self.state_dims = env.observation_space.shape[0]
+        self.action_dims = env.action_space.n
         self.gamma = gamma
         self.epsilon = epsilon_start
         self.epsilon_end = epsilon_end
         self.epsilon_decay = epsilon_decay
 
-        self.memory = ReplayBuffer(
-            state_dims, 1, max_memory_size, batch_size)
+        self.max_episodes = max_episodes
+        self.warmup = warmup
+        self.replace_steps = replace_steps
+        self.log = log
 
-        self.q_online = Q(state_dims, action_dims,
+        self.eval_rewards = []
+        self.eval_rewards_mean = []
+
+        self.memory = ReplayBuffer(
+            self.state_dims, 1, max_memory_size, batch_size)
+
+        self.q_online = Q(self.state_dims, self.action_dims,
                           hidden_dims, activation, dir, name + '.pt')
         self.q_target = deepcopy(self.q_online)
         self.device = DEVICE
@@ -88,15 +100,16 @@ class DQN():
     def replace_target_network(self):
         self.q_target = deepcopy(self.q_online)
 
-    def learn(self, max_episodes, warmup, replace_steps, average_len, target_reward, log=False):
+    def learn(self):
         step = 0
         rewards = []
         rewards_mean = []
 
-        eval_rewards = []
-        eval_rewards_mean = []
+        best_eval_reward = float('-inf')
+        self.eval_rewards = []
+        self.eval_rewards_mean = []
 
-        for episode in range(max_episodes):
+        for episode in range(self.max_episodes):
             state, done = self.env.reset(), False
             reward_sum = 0
             while not done:
@@ -106,29 +119,32 @@ class DQN():
                 self.memory.add_memory(state, action, next_state, reward, done)
                 state = next_state
                 reward_sum += reward
-                if step > warmup:
+                if step > self.warmup:
                     self.optimize()
                     self.decrease_epsilon()
-                if step % replace_steps == 0:
+                if step % self.replace_steps == 0:
                     self.replace_target_network()
             rewards.append(reward_sum)
-            eval_rewards.append(self.evaluate())
-            if episode >= average_len:
-                mean = np.mean(rewards[-average_len:])
-                eval_mean = np.mean(eval_rewards[-average_len:])
+            # evaluation step
+            eval_reward = self.evaluate()
+            if eval_reward > best_eval_reward:
+                best_eval_reward = eval_reward
+                self.q_online.save()
+            self.eval_rewards.append(eval_reward)
+            if episode >= 100:
+                mean = np.mean(rewards[-100:])
+                eval_mean = np.mean(self.eval_rewards[-100:])
                 rewards_mean.append(mean)
-                eval_rewards_mean.append(mean)
-                if log:
+                self.eval_rewards_mean.append(eval_mean)
+                if self.log:
                     print('--------------------------------------------------------')
                     print(f'Episode: {episode}')
                     print(f'Step: {step}')
+                    print(f'Evaluation Reward: {eval_reward}')
+                    print(f'Best Evaluation Reward: {best_eval_reward}')
                     print(f'Train Mean: {mean}')
                     print(f'Eval Mean: {eval_mean}')
                     print('--------------------------------------------------------')
-                    if eval_mean >= target_reward:
-                        print('GOAL ACHIEVED!')
-                        self.q_online.save()
-                        break
 
     def evaluate(self):
         state, done = self.env.reset(), False
