@@ -5,17 +5,21 @@ import torch
 import torch.nn.functional as F
 import torch.optim as optim
 import numpy as np
-import os
+import random
 
 
 class DQN():
     def __init__(self, env, double, hidden_dims=(128, 64), activation=F.relu, optimizer=optim.Adam,
                  alpha=0.0001, gamma=0.99, epsilon_start=1, epsilon_end=0.05, epsilon_decay=0.000035,
                  max_memory_size=1000000, batch_size=64,
-                 max_episodes=1000, warmup=100, replace_steps=100, log=False,
-                 dir='tmp', name='name'):
+                 max_episodes=1000, warmup=100, replace_steps=100,
+                 seed=49,
+                 log=False,
+                 dir='tmp',
+                 name='name'):
 
         self.env = env
+        self.set_seed(seed)
         self.double = double
         self.state_dims = env.observation_space.shape[0]
         self.action_dims = env.action_space.n
@@ -40,6 +44,13 @@ class DQN():
         self.q_target = deepcopy(self.q_online)
         self.device = DEVICE
         self.optimizer = optimizer(self.q_online.parameters(), alpha)
+
+    def set_seed(self, seed):
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+        self.env.seed(seed)
+        # TODO cuda seed
 
     @torch.no_grad()
     def act_greedy(self, state):
