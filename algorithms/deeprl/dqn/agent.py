@@ -8,11 +8,12 @@ from gym import wrappers
 
 
 class DQN():
-    def __init__(self, env, state_dims, action_dims, hidden_dims, activation, optimizer,
+    def __init__(self, env, double, state_dims, action_dims, hidden_dims, activation, optimizer,
                  alpha, gamma, epsilon_start, epsilon_end, epsilon_decay,
                  max_memory_size, batch_size, dir, name):
 
         self.env = env
+        self.double = double
         self.action_dims = action_dims
         self.gamma = gamma
         self.epsilon = epsilon_start
@@ -65,9 +66,16 @@ class DQN():
         states, actions, next_states, rewards, terminals = self.sample_batch()
 
         with torch.no_grad():
+            if self.double:
+                indices = torch.max(self.q_online(
+                    next_states).detach(), dim=1, keepdim=True)[1]
+            else:
+                indices = torch.max(self.q_target(
+                    next_states).detach(), dim=1, keepdim=True)[1]
+
             target = rewards + self.gamma * \
-                torch.max(self.q_target(next_states).detach(), dim=1, keepdim=True)[
-                    0] * torch.logical_not(terminals)
+                self.q_target(next_states).gather(
+                    dim=1, index=indices).detach() * torch.logical_not(terminals)
 
         online = self.q_online(states).gather(dim=1, index=actions)
 
