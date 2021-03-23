@@ -1,5 +1,5 @@
 from algorithms.deeprl.dqn.model import Q, DEVICE
-from algorithms.deeprl.common.memory import ReplayBuffer
+from algorithms.deeprl.common.memory import PER, PER
 from copy import deepcopy
 import torch
 import torch.nn.functional as F
@@ -21,6 +21,10 @@ class DQN():
                  epsilon_end=0.05,
                  epsilon_decay=0.000035,
                  tau=1,
+                 memory_alpha=0.6,
+                 memory_beta=0.1,
+                 memory_beta_increment=0.001,
+                 memory_epsilon=0.00001,
                  max_memory_size=1000000,
                  batch_size=64,
                  max_episodes=1000,
@@ -50,8 +54,15 @@ class DQN():
         self.eval_rewards = []
         self.eval_rewards_mean = []
 
-        self.memory = ReplayBuffer(
-            self.state_dims, 1, max_memory_size, batch_size)
+        self.memory = PER(
+            self.state_dims,
+            1,
+            max_memory_size,
+            batch_size,
+            alpha=memory_alpha,
+            beta=memory_beta,
+            beta_increment=memory_beta_increment,
+            epsilon=memory_epsilon)
 
         self.q_online = Q(self.state_dims, self.action_dims,
                           duelling, activation, dir, name + '.pt')
@@ -92,7 +103,7 @@ class DQN():
             self.epsilon = self.epsilon_end
 
     def sample_batch(self):
-        states, actions, next_states, rewards, terminals = self.memory.sample_batch()
+        states, actions, next_states, rewards, terminals, idxs, weights = self.memory.sample_batch()
         states = torch.tensor(states, dtype=torch.float32).to(self.device)
         actions = torch.tensor(actions, dtype=torch.int64).to(self.device)
         next_states = torch.tensor(
@@ -100,12 +111,14 @@ class DQN():
         rewards = torch.tensor(rewards, dtype=torch.float32).to(self.device)
         terminals = torch.tensor(
             terminals, dtype=torch.float32).to(self.device)
+        weights = torch.tensor(weights, dtype=torch.float32)
 
-        return states, actions, next_states, rewards, terminals
+        return states, actions, next_states, rewards, terminals, idxs, weights
 
     def optimize(self):
+        # torch.autograd.set_detect_anomaly(True)
         self.optimizer.zero_grad()
-        states, actions, next_states, rewards, terminals = self.sample_batch()
+        states, actions, next_states, rewards, terminals, idxs, weights = self.sample_batch()
 
         with torch.no_grad():
             if self.double:
@@ -122,10 +135,26 @@ class DQN():
         online = self.q_online(states).gather(dim=1, index=actions)
 
         error = target-online
-        loss = error.pow(2).mul(0.5).mean()
+        loss = (weights*error).pow(2).mul(0.5).mean()
         loss.backward()
         torch.nn.utils.clip_grad_norm_(self.q_online.parameters(), 1.0)
         self.optimizer.step()
+
+        # if np.isnan(weights).any():
+        #     print('WEIGHTS')
+        #     print(weights)
+
+        if np.isnan(error.detach().numpy()).any():
+            print('TARGET')
+            for param in self.q_target.parameters():
+                print(param)
+            print('ONLINE')
+            for param in self.q_online.parameters():
+                print(param)
+            print(self.memory.alpha)
+            print(self.memory.beta)
+
+        self.memory.update_priority(idxs, error.cpu().detach().numpy())
 
     def update_target_network(self):
         with torch.no_grad():
