@@ -12,7 +12,7 @@ class DQN():
     def __init__(self,
                  env,
                  double=False,
-                 hidden_dims=(128, 64),
+                 duelling=False,
                  activation=F.relu,
                  optimizer=optim.Adam,
                  alpha=0.0001,
@@ -54,7 +54,7 @@ class DQN():
             self.state_dims, 1, max_memory_size, batch_size)
 
         self.q_online = Q(self.state_dims, self.action_dims,
-                          hidden_dims, activation, dir, name + '.pt')
+                          duelling, activation, dir, name + '.pt')
         self.q_target = deepcopy(self.q_online)
 
         for param in self.q_target.parameters():
@@ -73,6 +73,7 @@ class DQN():
     @torch.no_grad()
     def act_greedy(self, state):
         state = torch.tensor(state, dtype=torch.float32).to(self.device)
+        state = state.unsqueeze(dim=0)
         actions = self.q_online(state).cpu().detach().numpy()
         greedy_action = np.argmax(actions)
         return greedy_action
