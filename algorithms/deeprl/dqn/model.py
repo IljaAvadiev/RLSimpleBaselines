@@ -3,8 +3,53 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import os
+import numpy as np
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+class CnnQ(nn.Module):
+    def __init__(self, action_dims, activation, dir, name):
+        super(CnnQ, self).__init__()
+        self.activation = activation
+
+        self.conv1 = nn.Conv2d(4, 32, 8, 4)
+        self.conv2 = nn.Conv2d(32, 64, 4, 2)
+        self.conv3 = nn.Conv2d(64, 64, 3, 1)
+
+        with torch.no_grad():
+            dummy = torch.zeros(size=(1, 4, 84, 84))
+            result = self.convolve(dummy).cpu().detach().numpy()
+            self.linear_input_dim = np.product(result.shape)
+
+        self.linear = nn.Linear(self.linear_input_dim, 512)
+        self.output = nn.Linear(512, action_dims)
+
+        
+        self.path = os.path.join(dir, name)
+        self.to(DEVICE)
+
+    def convolve(self, state):
+        x = state
+        x = self.activation(self.conv1(x))
+        x = self.activation(self.conv2(x))
+        x = self.activation(self.conv3(x))
+        return x
+
+    def forward(self, state):
+        x = state
+        x = self.convolve(x)
+        x = x.view(-1, self.linear_input_dim)
+
+        x = self.activation(self.linear(x))
+        x = self.output(x)
+
+        return x
+
+    def save(self):
+        torch.save(self.state_dict(), self.path)
+
+    def load(self):
+        self.load_state_dict(torch.load(self.path))
 
 
 class Q(nn.Module):
@@ -55,5 +100,4 @@ class Q(nn.Module):
 
     def load(self):
         self.load_state_dict(torch.load(self.path))
-
 

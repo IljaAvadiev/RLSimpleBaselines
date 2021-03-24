@@ -1,5 +1,5 @@
-from algorithms.deeprl.dqn.model import Q, DEVICE
-from algorithms.deeprl.common.memory import PER, PER
+from algorithms.deeprl.dqn.model import Q, CnnQ, DEVICE
+from algorithms.deeprl.common.memory import PER
 from copy import deepcopy
 import torch
 import torch.nn.functional as F
