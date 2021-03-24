@@ -14,11 +14,11 @@ class ReplayBuffer():
         self.current_memory_size = 0
 
         self.states = np.empty(
-            shape=(max_memory_size, state_dims), dtype=np.float32)
+            shape=(max_memory_size, *state_dims), dtype=np.float32)
         self.actions = np.empty(
             shape=(max_memory_size, action_dims), dtype=np.float32)
         self.next_states = np.empty(
-            shape=(max_memory_size, state_dims), dtype=np.float32)
+            shape=(max_memory_size, *state_dims), dtype=np.float32)
         self.rewards = np.empty(shape=(max_memory_size, 1), dtype=np.float32)
         self.terminals = np.empty(shape=(max_memory_size, 1), dtype=np.bool)
 
@@ -65,11 +65,11 @@ class PER():
         self.epsilon = epsilon
 
         self.states = np.zeros(
-            shape=(max_memory_size, state_dims), dtype=np.float32)
+            shape=(max_memory_size, *state_dims), dtype=np.float32)
         self.actions = np.zeros(
             shape=(max_memory_size, action_dims), dtype=np.float32)
         self.next_states = np.zeros(
-            shape=(max_memory_size, state_dims), dtype=np.float32)
+            shape=(max_memory_size, *state_dims), dtype=np.float32)
         self.rewards = np.zeros(shape=(max_memory_size, 1), dtype=np.float32)
         self.terminals = np.zeros(shape=(max_memory_size, 1), dtype=np.bool)
         self.priorities = np.zeros(

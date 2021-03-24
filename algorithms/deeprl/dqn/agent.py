@@ -38,7 +38,7 @@ class DQN():
         self.env = env
         self.set_seed(seed)
         self.double = double
-        self.state_dims = env.observation_space.shape[0]
+        self.state_dims = env.observation_space.shape
         self.action_dims = env.action_space.n
         self.gamma = gamma
         self.epsilon = epsilon_start
@@ -64,8 +64,11 @@ class DQN():
             beta_increment=memory_beta_increment,
             epsilon=memory_epsilon)
 
-        self.q_online = Q(self.state_dims, self.action_dims,
-                          duelling, activation, dir, name + '.pt')
+        if len(self.state_dims) == 1:
+            self.q_online = Q(*self.state_dims, self.action_dims,
+                            duelling, activation, dir, name + '.pt')
+        elif len(self.state_dims) > 1:
+            self.q_online = CnnQ(self.action_dims, activation, dir, name + '.pt')
         self.q_target = deepcopy(self.q_online)
 
         for param in self.q_target.parameters():
@@ -185,6 +188,18 @@ class DQN():
                 eval_mean = np.mean(self.eval_rewards[-100:])
                 rewards_mean.append(mean)
                 self.eval_rewards_mean.append(eval_mean)
+                if self.log:
+                    print('--------------------------------------------------------')
+                    print(f'Episode: {episode}')
+                    print(f'Step: {step}')
+                    print(f'Evaluation Reward: {eval_reward}')
+                    print(f'Best Evaluation Reward: {best_eval_reward}')
+                    print(f'Train Mean: {mean}')
+                    print(f'Eval Mean: {eval_mean}')
+                    print('--------------------------------------------------------')
+            else:
+                mean = np.mean(rewards)
+                eval_mean = np.mean(self.eval_rewards)
                 if self.log:
                     print('--------------------------------------------------------')
                     print(f'Episode: {episode}')
