@@ -111,7 +111,7 @@ class DQN():
         rewards = torch.tensor(rewards, dtype=torch.float32).to(self.device)
         terminals = torch.tensor(
             terminals, dtype=torch.float32).to(self.device)
-        weights = torch.tensor(weights, dtype=torch.float32)
+        weights = torch.tensor(weights, dtype=torch.float32).to(self.device)
 
         return states, actions, next_states, rewards, terminals, idxs, weights
 
@@ -139,20 +139,6 @@ class DQN():
         loss.backward()
         torch.nn.utils.clip_grad_norm_(self.q_online.parameters(), 1.0)
         self.optimizer.step()
-
-        # if np.isnan(weights).any():
-        #     print('WEIGHTS')
-        #     print(weights)
-
-        if np.isnan(error.detach().numpy()).any():
-            print('TARGET')
-            for param in self.q_target.parameters():
-                print(param)
-            print('ONLINE')
-            for param in self.q_online.parameters():
-                print(param)
-            print(self.memory.alpha)
-            print(self.memory.beta)
 
         self.memory.update_priority(idxs, error.cpu().detach().numpy())
 
