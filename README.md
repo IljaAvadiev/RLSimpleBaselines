@@ -11,6 +11,9 @@ Simple Baselines is intended to be an educational resource for Reinforcment Lear
 | Function Approheavy_check_markimators |       Status       |
 | :-----------------------------------: | :----------------: |
 |                  dqn                  | :heavy_check_mark: |
+|                  PER                  | :heavy_check_mark: |
+|                  ddqn                 | :heavy_check_mark: |
+|                  duelling dqn         | :heavy_check_mark: |
 |               reinforce               | :heavy_check_mark: |
 |                  a2c                  | :heavy_check_mark: |
 |                 ddpg                  | :heavy_check_mark: |
