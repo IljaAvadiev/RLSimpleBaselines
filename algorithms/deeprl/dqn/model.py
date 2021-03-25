@@ -6,6 +6,7 @@ import os
 import numpy as np
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print(f'Running on: {DEVICE}')
 
 class CnnQ(nn.Module):
     def __init__(self, action_dims, activation, dir, name):

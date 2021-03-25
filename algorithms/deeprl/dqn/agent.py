@@ -181,6 +181,7 @@ class DQN():
             eval_reward = self.evaluate()
             if eval_reward > best_eval_reward:
                 best_eval_reward = eval_reward
+                print('Saving best model')
                 self.q_online.save()
             self.eval_rewards.append(eval_reward)
             if episode >= 100:
@@ -210,7 +211,7 @@ class DQN():
                     print(f'Eval Mean: {eval_mean}')
                     print('--------------------------------------------------------')
 
-    def evaluate(self):
+    def evaluate(self, render=False):
         state, done = self.env.reset(), False
         reward_sum = 0
         while not done:
@@ -218,4 +219,6 @@ class DQN():
             next_state, reward, done, _ = self.env.step(action)
             state = next_state
             reward_sum += reward
+            if render:
+                self.env.render()
         return reward_sum
